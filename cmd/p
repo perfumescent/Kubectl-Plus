@@ -1,0 +1,118 @@
+#!/bin/bash
+
+# Help information
+usage() {
+    echo "Usage: p [options] [resource]"
+    echo "Options:"
+    echo "  -n, --namespace <namespace>  Specify namespace (default: dev)"
+    echo "  -w, --wide                  Output in wide format"
+    echo "  -l, --selector <label>      Filter by label"
+    echo "  -o, --output <format>       Output format (json|yaml|wide|custom)"
+    echo "  -A, --all-namespaces        List across all namespaces"
+    echo "  -S, --sort <field>          Sort by field (name|status|age)"
+    echo "Resource types: pod (default), svc, deploy, rs, sts"
+    exit 1
+}
+
+# Parameter parsing
+namespace="dev"
+resource="pod"
+wide=""
+selector=""
+output=""
+all_ns=""
+sort_field=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            usage
+            ;;
+        -n|--namespace)
+            namespace="$2"
+            shift 2
+            ;;
+        -w|--wide)
+            wide="-o wide"
+            shift
+            ;;
+        -l|--selector)
+            selector="--selector=$2"
+            shift 2
+            ;;
+        -o|--output)
+            case "$2" in
+                json|yaml|wide|custom)
+                    output="-o $2"
+                    ;;
+                *)
+                    echo "Error: Invalid output format. Use json|yaml|wide|custom"
+                    exit 1
+                    ;;
+            esac
+            shift 2
+            ;;
+        -A|--all-namespaces)
+            all_ns="--all-namespaces"
+            shift
+            ;;
+        -S|--sort)
+            sort_field="$2"
+            shift 2
+            ;;
+        *)
+            case "$1" in
+                pod|svc|deploy|rs|sts)
+                    resource="$1"
+                    ;;
+                *)
+                    echo "Error: Invalid resource type. Use pod|svc|deploy|rs|sts"
+                    exit 1
+                    ;;
+            esac
+            shift
+            ;;
+    esac
+done
+
+# Build and execute command
+cmd="kubectl get $resource"
+
+if [ ! -z "$all_ns" ]; then
+    cmd="$cmd $all_ns"
+elif [ ! -z "$namespace" ]; then
+    cmd="$cmd -n $namespace"
+fi
+
+if [ ! -z "$wide" ]; then
+    cmd="$cmd $wide"
+elif [ ! -z "$output" ]; then
+    cmd="$cmd $output"
+else
+    cmd="$cmd -o wide"  # Default to wide output
+fi
+
+if [ ! -z "$selector" ]; then
+    cmd="$cmd $selector"
+fi
+
+# Execute command and handle sorting if needed
+if [ ! -z "$sort_field" ]; then
+    case "$sort_field" in
+        name)
+            eval "$cmd | (head -n 1 && tail -n +2 | sort -k1,1)"
+            ;;
+        status)
+            eval "$cmd | (head -n 1 && tail -n +2 | sort -k3,3)"
+            ;;
+        age)
+            eval "$cmd | (head -n 1 && tail -n +2 | sort -k5,5)"
+            ;;
+        *)
+            echo "Error: Invalid sort field. Use name|status|age"
+            exit 1
+            ;;
+    esac
+else
+    eval "$cmd"
+fi

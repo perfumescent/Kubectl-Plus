@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# Help information
+usage() {
+    echo "Usage: i <pod> [options] [-- command]"
+    echo "Options:"
+    echo "  -n, --namespace <namespace>  Specify namespace (default: dev)"
+    echo "  -c, --container <container>  Specify container name"
+    echo "  -u, --user <user>           Run as specified user"
+    echo "  -s, --shell <shell>         Specify shell (default: sh)"
+    echo "Examples:"
+    echo "  i nginx                      # Enter default container with sh"
+    echo "  i nginx -c nginx-side        # Enter specific container"
+    echo "  i nginx -- ls /etc           # Run command without entering shell"
+    echo "  i nginx -s bash              # Use bash instead of sh"
+    exit 1
+}
+
+# Parameter parsing
+pod=""
+namespace="dev"
+container=""
+user=""
+shell="sh"
+command=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            usage
+            ;;
+        -n|--namespace)
+            namespace="$2"
+            shift 2
+            ;;
+        -c|--container)
+            container="$2"
+            shift 2
+            ;;
+        -u|--user)
+            user="--user $2"
+            shift 2
+            ;;
+        -s|--shell)
+            shell="$2"
+            shift 2
+            ;;
+        --)
+            shift
+            command="$*"
+            break
+            ;;
+        *)
+            if [ -z "$pod" ]; then
+                pod="$1"
+            else
+                echo "Error: Unexpected argument '$1'"
+                usage
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Check required parameters
+if [ -z "$pod" ]; then
+    echo "Error: Pod name is required"
+    usage
+fi
+
+# Get full pod name
+full_pod=$(kubectl -n $namespace get pod | grep $pod | awk '{print $1}')
+if [ -z "$full_pod" ]; then
+    echo "Error: Pod '$pod' not found in namespace '$namespace'"
+    exit 1
+fi
+
+# Build and execute command
+cmd="kubectl exec -it"
+if [ ! -z "$container" ]; then
+    cmd="$cmd -c $container"
+fi
+cmd="$cmd $user -n $namespace $full_pod"
+
+if [ ! -z "$command" ]; then
+    # Execute specific command
+    cmd="$cmd -- $command"
+else
+    # Enter shell
+    cmd="$cmd -- $shell"
+fi
+
+eval $cmd

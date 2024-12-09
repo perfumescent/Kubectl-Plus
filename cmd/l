@@ -1,10 +1,20 @@
 #!/bin/bash
 
+# Get default namespace from current context
+get_default_namespace() {
+    local current_ns=$(kubectl config view --minify --output 'jsonpath={..namespace}')
+    if [ -n "$current_ns" ]; then
+        echo "$current_ns"
+    else
+        echo "default"
+    fi
+}
+
 # Help information
 usage() {
     echo "Usage: l <pod> [options] [pattern]"
     echo "Options:"
-    echo "  -n, --namespace <namespace>  Specify namespace (default: dev)"
+    echo "  -n, --namespace <namespace>  Specify namespace (default: current context namespace)"
     echo "  -c, --container <container>  Specify container name"
     echo "  -p, --path <path>           Specify log path inside container (default: stdout)"
     echo "  -s, --start <pattern>       Display logs starting from the first match"
@@ -15,7 +25,7 @@ usage() {
 
 # Parameter parsing
 pod=""
-namespace="dev"
+namespace=$(get_default_namespace)
 container=""
 log_path=""
 pattern=""

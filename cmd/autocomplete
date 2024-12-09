@@ -1,0 +1,172 @@
+#!/bin/bash
+
+# Get namespaces for completion
+function _get_namespaces() {
+    # Cache namespaces for 5 seconds to avoid too many API calls
+    local cache_file="/tmp/kp_ns_cache"
+    local cache_age=5  # seconds
+
+    if [ -f "$cache_file" ]; then
+        # Check if cache is still valid
+        if [ $(($(date +%s) - $(stat -c %Y "$cache_file"))) -lt $cache_age ]; then
+            cat "$cache_file"
+            return
+        fi
+    fi
+
+    # Get fresh namespace list and update cache
+    kubectl get ns 2>/dev/null | tail -n +2 | awk '{print $1}' | tee "$cache_file"
+}
+
+# Get pods in specified namespace
+function _get_pods() {
+    local namespace="$1"
+    kubectl -n $namespace get pod 2>/dev/null | tail -n +2 | awk '{print $1}'
+}
+
+# Get services in specified namespace
+function _get_services() {
+    local namespace="$1"
+    kubectl -n $namespace get svc 2>/dev/null | tail -n +2 | awk '{print $1}'
+}
+
+# Get resource types for p command
+function _get_resources() {
+    echo "pod svc deploy rs sts"
+}
+
+# Main completion function for l and i commands
+function _kp_completion() {
+    local cur prev words cword
+    _init_completion || return
+
+    # Handle namespace completion
+    if [[ "$prev" == "-n" || "$prev" == "--namespace" ]]; then
+        # When -n or --namespace is specified, always show all available namespaces
+        local namespaces=$(_get_namespaces)
+        if [ -n "$namespaces" ]; then
+            COMPREPLY=($(compgen -W "$namespaces" -- "$cur"))
+        fi
+        return 0
+    fi
+
+    # Handle options
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "-n --namespace -c --container -s --shell" -- "$cur"))
+        return 0
+    fi
+
+    # Get current namespace (for pod/container completion)
+    local namespace="dev"  # 使用安装时指定的默认值
+    for ((i=1; i<${#words[@]}-1; i++)); do
+        if [[ "${words[i]}" == "-n" || "${words[i]}" == "--namespace" ]]; then
+            namespace="${words[i+1]}"
+            break
+        fi
+    done
+
+    # Handle first argument (pod name)
+    if [[ ${#words[@]} -eq 2 ]]; then
+        local pods=$(_get_pods "$namespace")
+        if [ -n "$pods" ]; then
+            COMPREPLY=($(compgen -W "$pods" -- "$cur"))
+        fi
+        return 0
+    fi
+
+    # Handle container completion
+    if [[ "$prev" == "-c" || "$prev" == "--container" ]]; then
+        if [ -n "${words[1]}" ]; then
+            local containers=$(kubectl -n "$namespace" get pod "${words[1]}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
+            COMPREPLY=($(compgen -W "$containers" -- "$cur"))
+        fi
+        return 0
+    fi
+}
+
+# Completion function for f command
+function _kp_completion_f() {
+    local cur prev words cword
+    _init_completion || return
+
+    # Handle namespace completion
+    if [[ "$prev" == "-n" || "$prev" == "--namespace" ]]; then
+        # When -n or --namespace is specified, always show all available namespaces
+        local namespaces=$(_get_namespaces)
+        if [ -n "$namespaces" ]; then
+            COMPREPLY=($(compgen -W "$namespaces" -- "$cur"))
+        fi
+        return 0
+    fi
+
+    # Handle options
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "-n --namespace -c --container -p --path" -- "$cur"))
+        return 0
+    fi
+
+    # Get current namespace (for service completion)
+    local namespace="dev"  # 使用安装时指定的默认值
+    for ((i=1; i<${#words[@]}-1; i++)); do
+        if [[ "${words[i]}" == "-n" || "${words[i]}" == "--namespace" ]]; then
+            namespace="${words[i+1]}"
+            break
+        fi
+    done
+
+    # Handle first argument (service name)
+    if [[ ${#words[@]} -eq 2 ]]; then
+        local services=$(_get_services "$namespace")
+        if [ -n "$services" ]; then
+            COMPREPLY=($(compgen -W "$services" -- "$cur"))
+        fi
+        return 0
+    fi
+}
+
+# Completion function for p command
+function _kp_completion_p() {
+    local cur prev words cword
+    _init_completion || return
+
+    # Handle namespace completion
+    if [[ "$prev" == "-n" || "$prev" == "--namespace" ]]; then
+        # When -n or --namespace is specified, always show all available namespaces
+        local namespaces=$(_get_namespaces)
+        if [ -n "$namespaces" ]; then
+            COMPREPLY=($(compgen -W "$namespaces" -- "$cur"))
+        fi
+        return 0
+    fi
+
+    # Handle resource type completion
+    if [[ ${#words[@]} -eq 2 ]]; then
+        COMPREPLY=($(compgen -W "$(_get_resources)" -- "$cur"))
+        return 0
+    fi
+
+    # Handle options
+    case "$prev" in
+        -o|--output)
+            COMPREPLY=($(compgen -W "json yaml wide custom" -- "$cur"))
+            return 0
+            ;;
+        -S|--sort)
+            COMPREPLY=($(compgen -W "name status age" -- "$cur"))
+            return 0
+            ;;
+        *)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=($(compgen -W "-n --namespace -w --wide -l --selector -o --output -A --all-namespaces -S --sort" -- "$cur"))
+                return 0
+            fi
+            ;;
+    esac
+}
+
+# Register completions
+complete -F _kp_completion l
+complete -F _kp_completion i
+complete -F _kp_completion_f f
+complete -F _kp_completion_p p
+
