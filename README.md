@@ -1,4 +1,3 @@
-# Kubectl-Plus
 
 <div align="center">
 
