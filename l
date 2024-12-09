@@ -1,13 +1,124 @@
 #!/bin/bash
-pod=$1
-word=$2
 
-if [  !  $word ]
-then 
-  echo "cd logs && tail \$(ls | sort -r | head -n 1) -n 500 -f" > ${pod}.sh
-else
-  echo "cd logs && sed -n '/$word/,\$p' \$(ls | sort -r | head -n 1) | more" > ${pod}.sh
+# Help information
+usage() {
+    echo "Usage: l <pod> [options] [pattern]"
+    echo "Options:"
+    echo "  -n, --namespace <namespace>  Specify namespace (default: dev)"
+    echo "  -c, --container <container>  Specify container name"
+    echo "  -p, --path <path>           Specify log path inside container (default: stdout)"
+    echo "  -s, --start <pattern>       Display logs starting from the first match"
+    echo "  -t, --tail <lines>          Show last N lines (default: 500)"
+    echo "  -f, --follow                Follow log output"
+    exit 1
+}
+
+# Parameter parsing
+pod=""
+namespace="dev"
+container=""
+log_path=""
+pattern=""
+tail_lines="500"
+follow=""
+start_mode=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            usage
+            ;;
+        -n|--namespace)
+            namespace="$2"
+            shift 2
+            ;;
+        -c|--container)
+            container="$2"
+            shift 2
+            ;;
+        -p|--path)
+            log_path="$2"
+            shift 2
+            ;;
+        -s|--start)
+            start_mode="true"
+            pattern="$2"
+            shift 2
+            ;;
+        -t|--tail)
+            tail_lines="$2"
+            shift 2
+            ;;
+        -f|--follow)
+            follow="-f"
+            shift
+            ;;
+        *)
+            if [ -z "$pod" ]; then
+                pod="$1"
+            else
+                pattern="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Check required parameters
+if [ -z "$pod" ]; then
+    echo "Error: Pod name is required"
+    usage
 fi
-kubectl cp -n dev ${pod}.sh $(kubectl -n dev get pod | grep ${pod} | awk '{print $1}'):tmp.sh
-rm -f ${pod}.sh
-kubectl exec -it $(kubectl -n dev get pod | grep ${pod} | awk '{print $1}') -n dev -- sh tmp.sh
+
+# Get full pod name
+full_pod=$(kubectl -n $namespace get pod | grep $pod | awk '{print $1}')
+if [ -z "$full_pod" ]; then
+    echo "Error: Pod '$pod' not found in namespace '$namespace'"
+    exit 1
+fi
+
+# Execute command based on log path
+if [ ! -z "$log_path" ]; then
+    # Custom log path mode: execute commands inside container
+    if [ "$start_mode" = "true" ]; then
+        # Start from pattern match
+        script="cd $(dirname $log_path) && sed -n '/$pattern/,\$p' $(basename $log_path) | more"
+    else
+        # Normal tail or grep mode
+        if [ ! -z "$pattern" ]; then
+            script="cd $(dirname $log_path) && grep --color=always -C3 '$pattern' $(basename $log_path)"
+        else
+            script="cd $(dirname $log_path) && tail -n $tail_lines $follow $(basename $log_path)"
+        fi
+    fi
+    
+    # Create temporary script
+    echo "$script" > ${pod}.sh
+    kubectl cp -n $namespace ${pod}.sh $full_pod:tmp.sh
+    rm -f ${pod}.sh
+    
+    # Execute script in container
+    if [ ! -z "$container" ]; then
+        kubectl exec -it $full_pod -c $container -n $namespace -- sh tmp.sh
+    else
+        kubectl exec -it $full_pod -n $namespace -- sh tmp.sh
+    fi
+else
+    # Standard output mode: use kubectl logs
+    cmd="kubectl logs"
+    if [ ! -z "$container" ]; then
+        cmd="$cmd -c $container"
+    fi
+    cmd="$cmd $follow --tail=$tail_lines -n $namespace $full_pod"
+
+    # Execute command
+    if [ "$start_mode" = "true" ]; then
+        eval "$cmd | sed -n '/$pattern/,\$p'"
+    else
+        if [ ! -z "$pattern" ]; then
+            eval "$cmd | grep --color=always -C3 '$pattern'"
+        else
+            eval "$cmd"
+        fi
+    fi
+fi
