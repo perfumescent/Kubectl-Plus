@@ -188,7 +188,7 @@ i -s [Tab]                 # 显示可用的shell选项 (sh/bash/zsh)
 
 ## 📝 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详细信息。
+本项目采用 the Apache License 2.0 许可证 - 查看 [LICENSE](LICENSE) 文件了解详细信息。
 
 ## 🌟 Star History
 
