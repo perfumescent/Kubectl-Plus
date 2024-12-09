@@ -187,8 +187,8 @@ We warmly welcome all forms of contributions! Here are some areas we're focusing
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
 ## 🌟 Star History
-
+                                 
 If you find this project helpful, please give it a star! Your support drives our continuous improvement!
