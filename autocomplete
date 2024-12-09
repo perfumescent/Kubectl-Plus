@@ -1,0 +1,13 @@
+#!/bin/bash
+function func() {
+    local pd=$(kubectl -n dev get pod | awk '{print $1}')
+    COMPREPLY=($(compgen -W "${pd}" -- ${COMP_WORDS[COMP_CWORD]}))
+}
+complete -F func into
+complete -F func l
+
+function funcf() {
+    local pd=$(kubectl -n dev get svc | awk '{print $1}')
+    COMPREPLY=($(compgen -W "${pd}" -- ${COMP_WORDS[COMP_CWORD]}))
+}
+complete -F funcf f
