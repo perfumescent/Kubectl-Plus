@@ -35,14 +35,24 @@ function _get_resources() {
     echo "pod svc deploy rs sts"
 }
 
-# Main completion function for l and i commands
-function _kp_completion() {
-    local cur prev words cword
-    _init_completion || return
+# Handle namespace parameter completion
+function _handle_namespace_completion() {
+    local cur="$1"
+    local prev="$2"
 
-    # Handle namespace completion
+    # Case 1: Handle partial parameter input (e.g. -n, --n)
+    if [[ "$cur" == -* ]]; then
+        if [[ "$cur" == --n* ]]; then
+            COMPREPLY=($(compgen -W "--namespace" -- "$cur"))
+            return 0
+        elif [[ "$cur" == -n* ]]; then
+            COMPREPLY=($(compgen -W "-n --namespace" -- "$cur"))
+            return 0
+        fi
+    fi
+
+    # Case 2: Handle namespace completion after parameter
     if [[ "$prev" == "-n" || "$prev" == "--namespace" ]]; then
-        # When -n or --namespace is specified, always show all available namespaces
         local namespaces=$(_get_namespaces)
         if [ -n "$namespaces" ]; then
             COMPREPLY=($(compgen -W "$namespaces" -- "$cur"))
@@ -50,23 +60,37 @@ function _kp_completion() {
         return 0
     fi
 
-    # Handle options
-    if [[ "$cur" == -* ]]; then
-        COMPREPLY=($(compgen -W "-n --namespace -c --container -s --shell" -- "$cur"))
+    return 1
+}
+
+# Main completion function for l and i commands
+function _kp_completion() {
+    COMPREPLY=()
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    # First priority: Handle namespace parameter completion
+    if _handle_namespace_completion "$cur" "$prev"; then
         return 0
     fi
 
-    # Get current namespace (for pod/container completion)
-    local namespace="dev"  # 使用安装时指定的默认值
-    for ((i=1; i<${#words[@]}-1; i++)); do
-        if [[ "${words[i]}" == "-n" || "${words[i]}" == "--namespace" ]]; then
-            namespace="${words[i+1]}"
+    # Second priority: Handle other parameters
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "-n --namespace -c --container -s --shell -f --follow -t --tail" -- "$cur"))
+        return 0
+    fi
+
+    # Get current namespace for pod/container completion
+    local namespace="dev"  # Default namespace
+    for ((i=1; i<${#COMP_WORDS[@]}-1; i++)); do
+        if [[ "${COMP_WORDS[i]}" == "-n" || "${COMP_WORDS[i]}" == "--namespace" ]]; then
+            namespace="${COMP_WORDS[i+1]}"
             break
         fi
     done
 
-    # Handle first argument (pod name)
-    if [[ ${#words[@]} -eq 2 ]]; then
+    # Third priority: Handle first argument (pod name)
+    if [[ ${#COMP_WORDS[@]} -eq 2 ]]; then
         local pods=$(_get_pods "$namespace")
         if [ -n "$pods" ]; then
             COMPREPLY=($(compgen -W "$pods" -- "$cur"))
@@ -74,10 +98,10 @@ function _kp_completion() {
         return 0
     fi
 
-    # Handle container completion
+    # Fourth priority: Handle container completion
     if [[ "$prev" == "-c" || "$prev" == "--container" ]]; then
-        if [ -n "${words[1]}" ]; then
-            local containers=$(kubectl -n "$namespace" get pod "${words[1]}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
+        if [ -n "${COMP_WORDS[1]}" ]; then
+            local containers=$(kubectl -n "$namespace" get pod "${COMP_WORDS[1]}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
             COMPREPLY=($(compgen -W "$containers" -- "$cur"))
         fi
         return 0
@@ -86,36 +110,32 @@ function _kp_completion() {
 
 # Completion function for f command
 function _kp_completion_f() {
-    local cur prev words cword
-    _init_completion || return
+    COMPREPLY=()
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    # Handle namespace completion
-    if [[ "$prev" == "-n" || "$prev" == "--namespace" ]]; then
-        # When -n or --namespace is specified, always show all available namespaces
-        local namespaces=$(_get_namespaces)
-        if [ -n "$namespaces" ]; then
-            COMPREPLY=($(compgen -W "$namespaces" -- "$cur"))
-        fi
+    # First priority: Handle namespace parameter completion
+    if _handle_namespace_completion "$cur" "$prev"; then
         return 0
     fi
 
-    # Handle options
+    # Second priority: Handle other parameters
     if [[ "$cur" == -* ]]; then
         COMPREPLY=($(compgen -W "-n --namespace -c --container -p --path" -- "$cur"))
         return 0
     fi
 
-    # Get current namespace (for service completion)
-    local namespace="dev"  # 使用安装时指定的默认值
-    for ((i=1; i<${#words[@]}-1; i++)); do
-        if [[ "${words[i]}" == "-n" || "${words[i]}" == "--namespace" ]]; then
-            namespace="${words[i+1]}"
+    # Get current namespace for service completion
+    local namespace="dev"  # Default namespace
+    for ((i=1; i<${#COMP_WORDS[@]}-1; i++)); do
+        if [[ "${COMP_WORDS[i]}" == "-n" || "${COMP_WORDS[i]}" == "--namespace" ]]; then
+            namespace="${COMP_WORDS[i+1]}"
             break
         fi
     done
 
-    # Handle first argument (service name)
-    if [[ ${#words[@]} -eq 2 ]]; then
+    # Third priority: Handle first argument (service name)
+    if [[ ${#COMP_WORDS[@]} -eq 2 ]]; then
         local services=$(_get_services "$namespace")
         if [ -n "$services" ]; then
             COMPREPLY=($(compgen -W "$services" -- "$cur"))
@@ -126,26 +146,22 @@ function _kp_completion_f() {
 
 # Completion function for p command
 function _kp_completion_p() {
-    local cur prev words cword
-    _init_completion || return
+    COMPREPLY=()
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    # Handle namespace completion
-    if [[ "$prev" == "-n" || "$prev" == "--namespace" ]]; then
-        # When -n or --namespace is specified, always show all available namespaces
-        local namespaces=$(_get_namespaces)
-        if [ -n "$namespaces" ]; then
-            COMPREPLY=($(compgen -W "$namespaces" -- "$cur"))
-        fi
+    # First priority: Handle namespace parameter completion
+    if _handle_namespace_completion "$cur" "$prev"; then
         return 0
     fi
 
-    # Handle resource type completion
-    if [[ ${#words[@]} -eq 2 ]]; then
+    # Second priority: Handle resource type completion
+    if [[ ${#COMP_WORDS[@]} -eq 2 ]]; then
         COMPREPLY=($(compgen -W "$(_get_resources)" -- "$cur"))
         return 0
     fi
 
-    # Handle options
+    # Third priority: Handle other parameters
     case "$prev" in
         -o|--output)
             COMPREPLY=($(compgen -W "json yaml wide custom" -- "$cur"))

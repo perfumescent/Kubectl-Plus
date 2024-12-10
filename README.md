@@ -3,7 +3,7 @@
 
 [English](README.md) | [中文](README_zh.md)
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/yourusername/kubectl-plus/pulls)
 
 </div>
@@ -39,7 +39,7 @@ cd Kubectl-Plus
 ./install.sh
 ```
 
-The installer will:
+The installer will: 
 - Check system requirements
 - Install commands to your PATH
 - Configure shell completion
@@ -120,11 +120,15 @@ All commands come with intelligent auto-completion support that makes your K8s o
 
 ### Namespace Completion
 ```bash
+# Complete namespace parameter
+l --n[Tab]                # Completes to: l --namespace
+l -n[Tab]                 # Completes to: l -n
+
 # Complete namespace after -n or --namespace
-l -n pro[Tab]              # Completes to: l -n production
-i -n stag[Tab]             # Completes to: i -n staging
-f -n dev[Tab]              # Completes to: f -n development
-p -n [Tab]                 # Shows all available namespaces
+l -n pro[Tab]            # Completes to: l -n production
+i -n stag[Tab]           # Completes to: i -n staging
+f -n dev[Tab]            # Completes to: f -n development
+p -n [Tab]               # Shows all available namespaces
 ```
 
 ### Resource Completion

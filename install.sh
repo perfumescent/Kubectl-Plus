@@ -42,7 +42,7 @@ setup_temp_dir() {
 cleanup() {
     if [ -d "$TEMP_DIR" ]; then
         rm -rf "$TEMP_DIR"
-        echo "\033[0;31m✓ Cleaned up temporary directory\033[0m"
+        echo "✅ Successfully clean up temporary directory"
         
     fi
 }
@@ -81,18 +81,17 @@ rollback() {
 
 # Logo
 print_logo() {
-    echo -e "${BLUE}"
-    echo '  _  __     _            _   _ '
-    echo ' | |/ /    | |          | | | |'
-    echo ' | . / _   | |__   ___  | |_| |'
-    echo ' |  < | | | |  _ \ / _ \ |  _  |'
-    echo ' | . \| |_| | |_) |  __/ | | | |'
-    echo ' |_|\_\\__,_|_.__/ \___| |_| |_|'
-    echo '        Plus - Make K8s Easier'
-    echo -e "${NC}"
-    echo -e "${YELLOW}Version: $VERSION${NC}"
-    echo -e "${YELLOW}Author:  $AUTHOR${NC}"
-    echo -e "${YELLOW}GitHub:  $PROJECT_URL${NC}"
+    echo -e "${BLUE}  _  __     _               _   _        _____  _           ${NC}"
+    echo -e "${BLUE} | |/ /    | |             | | | |      |  __ \| |          ${NC}"
+    echo -e "${BLUE} | ' /_   _| |__   ___  ___| |_| |______| |__) | |_   _ ___ ${NC}"
+    echo -e "${BLUE} |  <| | | | '_ \ / _ \/ __| __| |______|  ___/| | | | / __| ${NC}"
+    echo -e "${BLUE} | . \ |_| | |_) |  __/ (__| |_| |      | |    | | |_| \__ \ ${NC}"
+    echo -e "${BLUE} |_|\_\__,_|_.__/ \___|\___|\__|_|      |_|    |_|\__,_|___/ ${NC}"
+
+    echo -e "${BLUE}🚀 Easy Kubernetes CLI Management: \033[1;36mSimplified Commands, \033[1;35mSmart Completion!${NC}"
+    echo -e "${BLUE}Version: $VERSION${NC}"
+    echo -e "${BLUE}Author:  $AUTHOR${NC}"
+    echo -e "${BLUE}GitHub:  $PROJECT_URL${NC}"
     echo
 }
 
