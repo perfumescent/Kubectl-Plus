@@ -53,110 +53,120 @@ cd Kubectl-Plus
 
 ## 🎯 命令说明
 
-### 资源查看 - `p` 命令
+### 资源查看 - `kp p` 命令
 ```bash
 # 基本用法
-p                    # 查看默认命名空间的 Pod（宽格式输出）
-p svc                # 查看服务
-p deploy             # 查看部署
+kp p                    # 查看默认命名空间的 Pod（宽格式输出）
+kp p svc                # 查看服务
+kp p deploy             # 查看部署
 
 # 高级选项
-p -n prod            # 指定命名空间
-p -l app=nginx       # 按标签过滤
-p -o yaml            # YAML 格式输出
-p -A                 # 查看所有命名空间
-p -S name            # 按名称排序
+kp p -n prod            # 指定命名空间
+kp p -l app=nginx       # 按标签过滤
+kp p -o yaml            # YAML 格式输出
+kp p -A                 # 查看所有命名空间
+kp p -S name            # 按名称排序
 
 # 组合使用
-p -n prod -l tier=frontend -S status    # 查看 prod 命名空间下带标签的 Pod 并排序
-p deploy -A -o wide                     # 查看所有命名空间的部署（宽格式）
+kp p -n prod -l tier=frontend -S status    # 查看 prod 命名空间下带标签的 Pod 并排序
+kp p deploy -A -o wide                     # 查看所有命名空间的部署（宽格式）
 ```
 
-### Pod 访问 - `i` 命令
+### Pod 访问 - `kp i` 命令
 ```bash
 # 基本用法
-i nginx                     # 使用默认 shell 进入 Pod
-i nginx -c side-car        # 进入指定容器
-i nginx -- ls /etc         # 执行命令而不进入 shell
-i nginx -s bash            # 使用 bash 作为 shell
+kp i nginx                     # 使用默认 shell 进入 Pod
+kp i nginx -c side-car        # 进入指定容器
+kp i nginx -- ls /etc         # 执行命令而不进入 shell
+kp i nginx -s bash            # 使用 bash 作为 shell
 
 # 高级选项
-i nginx -n prod            # 指定命名空间
-i nginx -u root           # 以 root 用户运行
-i nginx -c nginx -s bash  # 使用 bash 进入 nginx 容器
+kp i nginx -n prod            # 指定命名空间
+kp i nginx -u root           # 以 root 用户运行
+kp i nginx -c nginx -s bash  # 使用 bash 进入 nginx 容器
 ```
 
-### 日志查看 - `l` 命令
+### 日志查看 - `kp l` 命令
 ```bash
 # 基本用法
-l pod-name                    # 查看最新日志（最后 500 行）
-l pod-name pattern           # 搜索包含 pattern 的日志（带上下文）
+kp l pod-name                    # 查看最新日志（最后 500 行）
+kp l pod-name pattern           # 搜索包含 pattern 的日志（带上下文）
 
 # 高级选项
-l pod-name -n namespace      # 指定命名空间
-l pod-name -c container      # 指定容器
-l pod-name -p /logs/*.log    # 查看自定义路径的日志（支持通配符）
-l pod-name -s pattern        # 从第一个匹配 pattern 处开始显示
-l pod-name -t 1000          # 显示最后 1000 行
-l pod-name -f               # 持续追踪日志输出
+kp l pod-name -n namespace      # 指定命名空间
+kp l pod-name -c container      # 指定容器
+kp l pod-name -p /logs/*.log    # 查看自定义路径的日志（支持通配符）
+kp l pod-name -s pattern        # 从第一个匹配 pattern 处开始显示
+kp l pod-name -t 1000          # 显示最后 1000 行
+kp l pod-name -f               # 持续追踪日志输出
 ```
 
-### 多 Pod 日志搜索 - `f` 命令
+### 多 Pod 日志搜索 - `kp f` 命令
 ```bash
 # 基本用法
-f service-name pattern        # 在服务的所有 Pod 中搜索匹配项
-                            # (带有彩色输出和上下文分隔符)
+kp f service-name pattern        # 在服务的所有 Pod 中搜索匹配项
+                               # (带有彩色输出和上下文分隔符)
 
 # 高级选项
-f service-name -n namespace pattern    # 指定命名空间
-f service-name -c container pattern    # 指定容器
-f service-name -p /logs/*.log pattern  # 在自定义日志路径中搜索
-f service-name pattern -C 5            # 显示 5 行上下文
-f service-name pattern -t 100          # 显示最后 100 行匹配结果
+kp f service-name -n namespace pattern    # 指定命名空间
+kp f service-name -c container pattern    # 指定容器
+kp f service-name -p /logs/*.log pattern  # 在自定义日志路径中搜索
+kp f service-name pattern -C 5            # 显示 5 行上下文
+kp f service-name pattern -t 100          # 显示最后 100 行匹配结果
 ```
 
 ## 🔮 智能自动补全
 
 所有命令都配备了智能自动补全支持，让您的 K8s 操作更流畅、更快速！
 
+### 命令补全
+```bash
+# 补全主命令
+kp [Tab]                 # 显示所有可用的子命令 (l, f, i, p)
+
+# 补全子命令选项
+kp l -[Tab]              # 显示日志命令的所有选项
+kp i --[Tab]             # 显示 Pod 访问命令的所有长选项
+```
+
 ### 命名空间补全
 ```bash
 # 补全命名空间参数
-l --n[Tab]                # 补全为: l --namespace
-l -n[Tab]                 # 补全为: l -n
+kp l --n[Tab]                # 补全为: kp l --namespace
+kp l -n[Tab]                 # 补全为: kp l -n
 
 # 在 -n 或 --namespace 后补全命名空间
-l -n pro[Tab]            # 补全为: l -n production
-i -n stag[Tab]           # 补全为: i -n staging
-f -n dev[Tab]            # 补全为: f -n development
-p -n [Tab]               # 显示所有可用的命名空间
+kp l -n pro[Tab]            # 补全为: kp l -n production
+kp i -n stag[Tab]           # 补全为: kp i -n staging
+kp f -n dev[Tab]            # 补全为: kp f -n development
+kp p -n [Tab]               # 显示所有可用的命名空间
 ```
 
 ### 资源补全
 ```bash
 # 补全 Pod 名称（会考虑命名空间上下文）
-l ng[Tab]                  # 显示当前命名空间的 nginx 相关 pod
-i -n prod ng[Tab]          # 显示 prod 命名空间的 nginx 相关 pod
+kp l ng[Tab]                  # 显示当前命名空间的 nginx 相关 pod
+kp i -n prod ng[Tab]          # 显示 prod 命名空间的 nginx 相关 pod
 
 # 补全服务名称
-f ng[Tab]                  # 显示 nginx 相关服务
-f -n prod ng[Tab]          # 显示 prod 命名空间的 nginx 相关服务
+kp f ng[Tab]                  # 显示 nginx 相关服务
+kp f -n prod ng[Tab]          # 显示 prod 命名空间的 nginx 相关服务
 
 # 补全 p 命令的资源类型
-p dep[Tab]                 # 补全为: p deploy
-p [Tab]                    # 显示所有资源类型 (pod/svc/deploy/rs/sts)
+kp p dep[Tab]                 # 补全为: kp p deploy
+kp p [Tab]                    # 显示所有资源类型 (pod/svc/deploy/rs/sts)
 ```
 
 ### 选项补全
 ```bash
 # 补全命令选项
-p -[Tab]                   # 显示所有选项 (-n, -w, -l, -o, -A, -S)
-i --[Tab]                  # 显示所有长选项 (--namespace, --container 等)
+kp p -[Tab]                   # 显示所有选项 (-n, -w, -l, -o, -A, -S)
+kp i --[Tab]                  # 显示所有长选项 (--namespace, --container 等)
 
 # 补全选项值
-p -o [Tab]                 # 显示输出格式选项 (json/yaml/wide/custom)
-p -S [Tab]                 # 显示排序字段选项 (name/status/age)
-i -s [Tab]                 # 显示可用的 shell 选项 (sh/bash/zsh)
+kp p -o [Tab]                 # 显示输出格式选项 (json/yaml/wide/custom)
+kp p -S [Tab]                 # 显示排序字段选项 (name/status/age)
+kp i -s [Tab]                 # 显示可用的 shell 选项 (sh/bash/zsh)
 ```
 
 ## 🤝 参与贡献

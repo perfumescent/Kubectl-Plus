@@ -63,9 +63,47 @@ function _handle_namespace_completion() {
     return 1
 }
 
-# Main completion function for l and i commands
+# Main completion function for kp command
 function _kp_completion() {
     COMPREPLY=()
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    # Complete main command options
+    if [[ ${#COMP_WORDS[@]} -eq 2 ]]; then
+        if [[ "$cur" == -* ]]; then
+            COMPREPLY=($(compgen -W "-h --help -v --version" -- "$cur"))
+        else
+            COMPREPLY=($(compgen -W "l f i p" -- "$cur"))
+        fi
+        return 0
+    fi
+
+    # Get subcommand
+    local subcmd="${COMP_WORDS[1]}"
+
+    # Handle subcommand completion
+    case "$subcmd" in
+        l)
+            _kp_completion_l
+            ;;
+        f)
+            _kp_completion_f
+            ;;
+        i)
+            _kp_completion_i
+            ;;
+        p)
+            _kp_completion_p
+            ;;
+        *)
+            COMPREPLY=()
+            ;;
+    esac
+}
+
+# Completion function for l subcommand
+function _kp_completion_l() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local prev="${COMP_WORDS[COMP_CWORD-1]}"
 
@@ -82,7 +120,7 @@ function _kp_completion() {
 
     # Get current namespace for pod/container completion
     local namespace="dev"  # Default namespace
-    for ((i=1; i<${#COMP_WORDS[@]}-1; i++)); do
+    for ((i=2; i<${#COMP_WORDS[@]}-1; i++)); do
         if [[ "${COMP_WORDS[i]}" == "-n" || "${COMP_WORDS[i]}" == "--namespace" ]]; then
             namespace="${COMP_WORDS[i+1]}"
             break
@@ -90,7 +128,7 @@ function _kp_completion() {
     done
 
     # Third priority: Handle first argument (pod name)
-    if [[ ${#COMP_WORDS[@]} -eq 2 ]]; then
+    if [[ ${#COMP_WORDS[@]} -eq 3 ]]; then
         local pods=$(_get_pods "$namespace")
         if [ -n "$pods" ]; then
             COMPREPLY=($(compgen -W "$pods" -- "$cur"))
@@ -100,17 +138,16 @@ function _kp_completion() {
 
     # Fourth priority: Handle container completion
     if [[ "$prev" == "-c" || "$prev" == "--container" ]]; then
-        if [ -n "${COMP_WORDS[1]}" ]; then
-            local containers=$(kubectl -n "$namespace" get pod "${COMP_WORDS[1]}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
+        if [ -n "${COMP_WORDS[2]}" ]; then
+            local containers=$(kubectl -n "$namespace" get pod "${COMP_WORDS[2]}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
             COMPREPLY=($(compgen -W "$containers" -- "$cur"))
         fi
         return 0
     fi
 }
 
-# Completion function for f command
+# Completion function for f subcommand
 function _kp_completion_f() {
-    COMPREPLY=()
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local prev="${COMP_WORDS[COMP_CWORD-1]}"
 
@@ -127,7 +164,7 @@ function _kp_completion_f() {
 
     # Get current namespace for service completion
     local namespace="dev"  # Default namespace
-    for ((i=1; i<${#COMP_WORDS[@]}-1; i++)); do
+    for ((i=2; i<${#COMP_WORDS[@]}-1; i++)); do
         if [[ "${COMP_WORDS[i]}" == "-n" || "${COMP_WORDS[i]}" == "--namespace" ]]; then
             namespace="${COMP_WORDS[i+1]}"
             break
@@ -135,7 +172,7 @@ function _kp_completion_f() {
     done
 
     # Third priority: Handle first argument (service name)
-    if [[ ${#COMP_WORDS[@]} -eq 2 ]]; then
+    if [[ ${#COMP_WORDS[@]} -eq 3 ]]; then
         local services=$(_get_services "$namespace")
         if [ -n "$services" ]; then
             COMPREPLY=($(compgen -W "$services" -- "$cur"))
@@ -144,9 +181,52 @@ function _kp_completion_f() {
     fi
 }
 
-# Completion function for p command
+# Completion function for i subcommand
+function _kp_completion_i() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    # First priority: Handle namespace parameter completion
+    if _handle_namespace_completion "$cur" "$prev"; then
+        return 0
+    fi
+
+    # Second priority: Handle other parameters
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "-n --namespace -c --container -s --shell" -- "$cur"))
+        return 0
+    fi
+
+    # Get current namespace for pod/container completion
+    local namespace="dev"  # Default namespace
+    for ((i=2; i<${#COMP_WORDS[@]}-1; i++)); do
+        if [[ "${COMP_WORDS[i]}" == "-n" || "${COMP_WORDS[i]}" == "--namespace" ]]; then
+            namespace="${COMP_WORDS[i+1]}"
+            break
+        fi
+    done
+
+    # Third priority: Handle first argument (pod name)
+    if [[ ${#COMP_WORDS[@]} -eq 3 ]]; then
+        local pods=$(_get_pods "$namespace")
+        if [ -n "$pods" ]; then
+            COMPREPLY=($(compgen -W "$pods" -- "$cur"))
+        fi
+        return 0
+    fi
+
+    # Fourth priority: Handle container completion
+    if [[ "$prev" == "-c" || "$prev" == "--container" ]]; then
+        if [ -n "${COMP_WORDS[2]}" ]; then
+            local containers=$(kubectl -n "$namespace" get pod "${COMP_WORDS[2]}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
+            COMPREPLY=($(compgen -W "$containers" -- "$cur"))
+        fi
+        return 0
+    fi
+}
+
+# Completion function for p subcommand
 function _kp_completion_p() {
-    COMPREPLY=()
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local prev="${COMP_WORDS[COMP_CWORD-1]}"
 
@@ -156,8 +236,12 @@ function _kp_completion_p() {
     fi
 
     # Second priority: Handle resource type completion
-    if [[ ${#COMP_WORDS[@]} -eq 2 ]]; then
-        COMPREPLY=($(compgen -W "$(_get_resources)" -- "$cur"))
+    if [[ ${#COMP_WORDS[@]} -eq 3 ]]; then
+        if [[ "$cur" == -* ]]; then
+            COMPREPLY=($(compgen -W "-n --namespace -w --wide -l --selector -o --output -A --all-namespaces -S --sort" -- "$cur"))
+        else
+            COMPREPLY=($(compgen -W "$(_get_resources)" -- "$cur"))
+        fi
         return 0
     fi
 
@@ -181,8 +265,5 @@ function _kp_completion_p() {
 }
 
 # Register completions
-complete -F _kp_completion l
-complete -F _kp_completion i
-complete -F _kp_completion_f f
-complete -F _kp_completion_p p
+complete -F _kp_completion kp
 

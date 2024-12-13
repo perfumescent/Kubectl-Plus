@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+# Help information
+usage() {
+    echo "Usage: kp <command> [options]"
+    echo
+    echo "Commands:"
+    echo "  l    View and search logs"
+    echo "  f    Search logs across multiple pods"
+    echo "  i    Enter pod or execute commands"
+    echo "  p    View resources in wide format"
+    echo
+    echo "Options:"
+    echo "  -h, --help     Show this help message"
+    echo "  -v, --version  Show version information"
+    echo
+    echo "Run 'kp <command> --help' for more information on a command."
+    exit 1
+}
+
+# Version information
+version() {
+    echo "Kubectl-Plus v1.0.0"
+    echo "A carefully crafted set of Kubectl automation tools"
+    exit 0
+}
+
+# Main command handler
+if [ $# -eq 0 ]; then
+    usage
+fi
+
+case "$1" in
+    -h|--help)
+        usage
+        ;;
+    -v|--version)
+        version
+        ;;
+    l|f|i|p)
+        cmd="$1"
+        shift
+        # 使用 kubectl 风格的子命令
+        "kp-$cmd" "$@"
+        ;;
+    *)
+        echo "Error: Unknown command '$1'"
+        echo "Run 'kp --help' for usage."
+        exit 1
+        ;;
+esac 

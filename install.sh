@@ -1,10 +1,20 @@
 #!/bin/bash
 
+##################################### Global variables #####################################
 # Project information
 PROJECT_NAME="Kubectl-Plus"
 PROJECT_URL="https://github.com/perfumescent/Kubectl-Plus"
 AUTHOR="perfumescent"
 VERSION="1.0.0"
+
+# Subcommands
+SUBCOMMANDS=("l" "f" "i" "p")
+SUBCOMMAND_NAMES=(
+    "l:View and search logs"
+    "f:Search logs across multiple pods"
+    "i:Enter pod or execute commands"
+    "p:View resources in wide format"
+)
 
 # Colors
 RED='\033[0;31m'
@@ -13,7 +23,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Global variables
+# File locations
 BIN_DIR="/usr/local/bin"
 if [ ! -w "$BIN_DIR" ]; then
     BIN_DIR="$HOME/.local/bin"
@@ -30,6 +40,46 @@ INSTALL_MODE=""
 # Version file location
 VERSION_FILE="$HOME/.kubectl-plus/version"
 
+##################################### Specification #####################################
+# Installation Process Overview:
+# 1. Pre-installation
+#    - Check system requirements (kubectl, curl)
+#    - Verify kubectl cluster connectivity
+#    - Create temporary directories for installation
+#
+# 2. Installation Mode Detection
+#    - Check for local files (cmd/kp, cmd/l, cmd/f, cmd/i, cmd/p, cmd/autocomplete)
+#    - Determine mode: local, online, upgrade, downgrade, or reinstall
+#    - For upgrades: backup existing installation
+#
+# 3. File Preparation
+#    - Local mode: Copy files from cmd/ directory
+#    - Online mode: Download files from GitHub
+#    - Convert Windows line endings to Unix format
+#
+# 4. Installation Steps
+#    - Install main command (kp) to BIN_DIR
+#    - Install subcommands with kubectl-style naming (kp-l, kp-f, kp-i, kp-p)
+#    - Install shell completion
+#    - Configure default namespace
+#    - Save version information
+#
+# Key Features:
+# - Supports multiple installation modes (local/online/upgrade)
+# - Automatic backup and rollback capability
+# - Shell completion for bash/zsh
+# - Configurable default namespace
+# - Version management
+#
+# Important Notes:
+# 1. BIN_DIR fallback: Uses ~/.local/bin if /usr/local/bin is not writable
+# 2. Subcommands follow kubectl plugin naming convention (kp-*)
+# 3. All operations are atomic with rollback support
+# 4. Shell completion requires restart or source after installation
+# 5. Version information is stored in ~/.kubectl-plus/version
+
+##################################### Functions #####################################
+
 # Create temporary directory
 setup_temp_dir() {
     TEMP_DIR=$(mktemp -d)
@@ -42,8 +92,7 @@ setup_temp_dir() {
 cleanup() {
     if [ -d "$TEMP_DIR" ]; then
         rm -rf "$TEMP_DIR"
-        echo "✅ Successfully clean up temporary directory"
-        
+        echo "Cleaned up temporary directory"
     fi
 }
 
@@ -100,19 +149,34 @@ download_commands() {
     echo -e "${BLUE}Downloading kubectl-plus commands...${NC}"
     
     local base_url="$PROJECT_URL/raw/main"
-    local commands=("l" "f" "i" "p" "autocomplete")
     
-    for cmd in "${commands[@]}"; do
-        if ! curl -fsSL "$base_url/cmd/$cmd" -o "$TEMP_DIR/$cmd"; then
+    # Create subdirectories
+    mkdir -p "$TEMP_DIR/subcmd"
+    
+    # Download main command
+    if ! curl -fsSL "$base_url/cmd/kp" -o "$TEMP_DIR/kp"; then
+        echo -e "${RED}Failed to download main command${NC}"
+        return 1
+    fi
+    chmod +x "$TEMP_DIR/kp"
+    echo -e "${GREEN}✓ Downloaded: kp${NC}"
+    
+    # Download subcommands
+    for cmd in "${SUBCOMMANDS[@]}"; do
+        if ! curl -fsSL "$base_url/cmd/$cmd" -o "$TEMP_DIR/subcmd/$cmd"; then
             echo -e "${RED}Failed to download $cmd${NC}"
             return 1
         fi
-        # Only set execute permission for command files, not autocomplete
-        if [ "$cmd" != "autocomplete" ]; then
-            chmod +x "$TEMP_DIR/$cmd"
-        fi
+        chmod +x "$TEMP_DIR/subcmd/$cmd"
         echo -e "${GREEN}✓ Downloaded: $cmd${NC}"
     done
+    
+    # Download autocomplete
+    if ! curl -fsSL "$base_url/cmd/autocomplete" -o "$TEMP_DIR/autocomplete"; then
+        echo -e "${RED}Failed to download autocomplete${NC}"
+        return 1
+    fi
+    echo -e "${GREEN}✓ Downloaded: autocomplete${NC}"
     
     return 0
 }
@@ -186,22 +250,36 @@ install_completion() {
     echo -e "${GREEN}✓ Completion installed${NC}"
 }
 
+# Convert Windows line endings to Unix
+convert_line_endings() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        # Remove carriage returns
+        sed -i 's/\r$//' "$file"
+    fi
+}
+
 # Install binaries
 install_binaries() {
     echo -e "${BLUE}Installing kubectl-plus commands...${NC}"
     
-    # Install each command
-    local commands=("l" "f" "i" "p")
-    for cmd in "${commands[@]}"; do
-        if [ -f "$BIN_DIR/$cmd" ]; then
-            cp "$BIN_DIR/$cmd" "$BACKUP_DIR/"
-            echo -e "${BLUE}Backing up existing command: ${cmd}${NC}"
+    # Install main command
+    if [ -f "$BIN_DIR/kp" ]; then
+        cp "$BIN_DIR/kp" "$BACKUP_DIR/"
+    fi
+    cp "$TEMP_DIR/kp" "$BIN_DIR/"
+    chmod 755 "$BIN_DIR/kp"
+    INSTALLED_FILES+=("$BIN_DIR/kp")
+    
+    # Install subcommands with kubectl style naming
+    for cmd in "${SUBCOMMANDS[@]}"; do
+        local target="$BIN_DIR/kp-$cmd"
+        if [ -f "$target" ]; then
+            cp "$target" "$BACKUP_DIR/"
         fi
-        
-        # Install new command
-        cp "$TEMP_DIR/$cmd" "$BIN_DIR/"
-        chmod 755 "$BIN_DIR/$cmd"
-        INSTALLED_FILES+=("$BIN_DIR/$cmd")
+        cp "$TEMP_DIR/subcmd/$cmd" "$target"
+        chmod 755 "$target"
+        INSTALLED_FILES+=("$target")
     done
     
     # Add bin directory to PATH if needed
@@ -222,11 +300,12 @@ configure_namespace() {
     echo -e "Using namespace: ${YELLOW}${namespace}${NC}"
     
     # Update namespace in command files
-    for cmd in l f i p; do
-        if [ -f "$BIN_DIR/$cmd" ]; then
-            sed -i "s/dev/${namespace}/g" "$BIN_DIR/$cmd"
+    for cmd in "${SUBCOMMANDS[@]}"; do
+        local cmd_file="$BIN_DIR/kp-$cmd"
+        if [ -f "$cmd_file" ]; then
+            sed -i "s/^namespace=\"[^\"]*\"$/namespace=\"${namespace}\"/" "$cmd_file"
         else
-            echo -e "${RED}Warning: Command file $cmd not found in $BIN_DIR${NC}"
+            echo -e "${YELLOW}Warning: Command file $cmd not found in $BIN_DIR/kp-$cmd${NC}"
         fi
     done
     
@@ -255,7 +334,7 @@ check_local_files() {
     local missing_files=()
     
     # Check all files in cmd directory
-    for cmd in "l" "f" "i" "p" "autocomplete"; do
+    for cmd in "${SUBCOMMANDS[@]}"; do
         if [ ! -f "cmd/$cmd" ]; then
             all_files_exist=false
             missing_files+=("cmd/$cmd")
@@ -303,26 +382,44 @@ copy_local_files() {
     echo -e "${BLUE}Copying local files...${NC}"
     local copy_failed=false
     
-    # Copy command files and autocomplete
-    for cmd in "l" "f" "i" "p" "autocomplete"; do
+    # Create subdirectories
+    mkdir -p "$TEMP_DIR/subcmd"
+    
+    # Copy main command
+    if [ -f "cmd/kp" ]; then
+        cp "cmd/kp" "$TEMP_DIR/" || copy_failed=true
+        chmod +x "$TEMP_DIR/kp"
+    else
+        echo -e "${YELLOW}Warning: Main command 'cmd/kp' not found${NC}"
+        copy_failed=true
+    fi
+    
+    # Copy subcommands
+    for cmd in "${SUBCOMMANDS[@]}"; do
         if [ -f "cmd/$cmd" ]; then
-            cp "cmd/$cmd" "$TEMP_DIR/" || copy_failed=true
-            # Only set execute permission for command files, not autocomplete
-            if [ "$cmd" != "autocomplete" ]; then
-                chmod +x "$TEMP_DIR/$cmd" 2>/dev/null
-            fi
+            cp "cmd/$cmd" "$TEMP_DIR/subcmd/" || copy_failed=true
+            chmod +x "$TEMP_DIR/subcmd/$cmd"
         else
-            echo -e "${YELLOW}Warning: File 'cmd/$cmd' not found${NC}"
+            echo -e "${YELLOW}Warning: Subcommand 'cmd/$cmd' not found${NC}"
             copy_failed=true
         fi
     done
+    
+    # Copy autocomplete
+    if [ -f "cmd/autocomplete" ]; then
+        cp "cmd/autocomplete" "$TEMP_DIR/" || copy_failed=true
+    else
+        echo -e "${YELLOW}Warning: Autocomplete file not found${NC}"
+        copy_failed=true
+    fi
     
     if [ "$copy_failed" = true ]; then
         case $INSTALL_MODE in
             "upgrade"|"downgrade"|"reinstall")
                 echo -e "${RED}Error: Some local files are missing. Cannot proceed with ${INSTALL_MODE}.${NC}"
                 echo -e "${YELLOW}Tip: Please make sure all required files are present in the correct locations:${NC}"
-                echo -e "  - cmd/l, cmd/f, cmd/i, cmd/p"
+                echo -e "  - cmd/kp"
+                echo -e "  - cmd/{${SUBCOMMANDS[*]}}"
                 echo -e "  - cmd/autocomplete"
                 return 1
                 ;;
@@ -439,7 +536,7 @@ backup_existing_installation() {
     fi
     
     # Backup command files
-    for cmd in "l" "f" "i" "p"; do
+    for cmd in "${SUBCOMMANDS[@]}"; do
         if [ -f "$BIN_DIR/$cmd" ]; then
             cp "$BIN_DIR/$cmd" "$BACKUP_DIR/"
         fi
@@ -464,7 +561,7 @@ restore_from_backup() {
     fi
     
     # Restore command files
-    for cmd in "l" "f" "i" "p"; do
+    for cmd in "${SUBCOMMANDS[@]}"; do
         if [ -f "$backup_dir/$cmd" ]; then
             cp "$backup_dir/$cmd" "$BIN_DIR/"
             chmod 755 "$BIN_DIR/$cmd"
