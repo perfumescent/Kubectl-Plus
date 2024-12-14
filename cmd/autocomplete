@@ -93,8 +93,8 @@ function _kp_completion() {
         i)
             _kp_completion_i
             ;;
-        p)
-            _kp_completion_p
+        g)
+            _kp_completion_g
             ;;
         *)
             COMPREPLY=()
@@ -225,8 +225,8 @@ function _kp_completion_i() {
     fi
 }
 
-# Completion function for p subcommand
-function _kp_completion_p() {
+# Completion function for g subcommand
+function _kp_completion_g() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local prev="${COMP_WORDS[COMP_CWORD-1]}"
 

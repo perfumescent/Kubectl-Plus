@@ -2,7 +2,7 @@
 
 # Help information
 usage() {
-    echo "Usage: p [options] [resource]"
+    echo "Usage: g [options] [resource]"
     echo "Options:"
     echo "  -n, --namespace <namespace>  Specify namespace (default: dev)"
     echo "  -w, --wide                  Output in wide format"

@@ -8,12 +8,12 @@ AUTHOR="perfumescent"
 VERSION="1.0.0"
 
 # Subcommands
-SUBCOMMANDS=("l" "f" "i" "p")
+SUBCOMMANDS=("l" "f" "i" "g")
 SUBCOMMAND_NAMES=(
-    "l:View and search logs"
-    "f:Search logs across multiple pods"
-    "i:Enter pod or execute commands"
-    "p:View resources in wide format"
+    "l:log (View and search logs)"
+    "f:find (Search logs across multiple pods)"
+    "i:into (Enter pod by bash)"
+    "g:get (View resources in wide format)"
 )
 
 # Colors
@@ -48,7 +48,7 @@ VERSION_FILE="$HOME/.kubectl-plus/version"
 #    - Create temporary directories for installation
 #
 # 2. Installation Mode Detection
-#    - Check for local files (cmd/kp, cmd/l, cmd/f, cmd/i, cmd/p, cmd/autocomplete)
+#    - Check for local files (cmd/kp, cmd/l, cmd/f, cmd/i, cmd/g, cmd/autocomplete)
 #    - Determine mode: local, online, upgrade, downgrade, or reinstall
 #    - For upgrades: backup existing installation
 #
@@ -59,7 +59,7 @@ VERSION_FILE="$HOME/.kubectl-plus/version"
 #
 # 4. Installation Steps
 #    - Install main command (kp) to BIN_DIR
-#    - Install subcommands with kubectl-style naming (kp-l, kp-f, kp-i, kp-p)
+#    - Install subcommands with kubectl-style naming (kp-l, kp-f, kp-i, kp-g)
 #    - Install shell completion
 #    - Configure default namespace
 #    - Save version information
