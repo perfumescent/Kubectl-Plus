@@ -103,11 +103,27 @@ download_commands() {
     local base_url="$PROJECT_URL/raw/$BRANCH"
     local commands=("l" "f" "i" "p" "kp" "autocomplete")
     
+    echo -e "${BLUE}Using repository: ${base_url}${NC}"
+    
     for cmd in "${commands[@]}"; do
-        if ! curl -fsSL "$base_url/cmd/$cmd" -o "$TEMP_DIR/$cmd"; then
-            echo -e "${RED}Failed to download $cmd${NC}"
+        local url="${base_url}/cmd/${cmd}"
+        echo -e "Downloading ${cmd}... "
+        
+        # 使用 -v 参数让 curl 显示详细信息，但只在失败时显示
+        if ! curl -fsSL --connect-timeout 10 --retry 3 --retry-delay 2 \
+            -w "\n%{http_code} %{url_effective}\n" \
+            "$url" -o "$TEMP_DIR/$cmd" 2>"$TEMP_DIR/${cmd}.error"; then
+            
+            local status=$?
+            echo -e "${RED}Failed to download ${cmd}${NC}"
+            echo -e "${RED}Error details:${NC}"
+            cat "$TEMP_DIR/${cmd}.error"
+            echo -e "${RED}HTTP Status: $(cat "$TEMP_DIR/${cmd}.error" | grep "^[0-9]\{3\}" || echo 'Unknown')${NC}"
+            echo -e "${RED}URL: ${url}${NC}"
+            echo -e "${RED}Curl exit code: ${status}${NC}"
             return 1
         fi
+        
         # Only set execute permission for command files, not autocomplete
         if [ "$cmd" != "autocomplete" ]; then
             chmod +x "$TEMP_DIR/$cmd"
@@ -497,31 +513,51 @@ restore_from_backup() {
 
 # Enhanced rollback for upgrades
 enhanced_rollback() {
-    echo -e "${RED}Installation failed during ${INSTALL_MODE}! Rolling back...${NC}"
+    local err_code=$?
+    local err_line=$1
+    local err_cmd="${BASH_COMMAND}"
+    
+    echo -e "\n${RED}Installation failed during ${INSTALL_MODE}!${NC}"
+    echo -e "${RED}Error occurred in line ${err_line}${NC}"
+    echo -e "${RED}Command: ${err_cmd}${NC}"
+    echo -e "${RED}Exit code: ${err_code}${NC}"
+    
+    # 如果是下载失败，显示具体的URL
+    if [[ "$err_cmd" == *"curl"* ]]; then
+        local url=$(echo "$err_cmd" | grep -o 'http[s]*://[^ ]*')
+        echo -e "${RED}Failed to download from: ${url}${NC}"
+        echo -e "${YELLOW}Please check:${NC}"
+        echo -e "1. Your internet connection"
+        echo -e "2. The repository URL: ${PROJECT_URL}"
+        echo -e "3. The branch name: ${BRANCH}"
+    fi
     
     case $INSTALL_MODE in
         "upgrade"|"downgrade"|"reinstall")
             if [ -d "$BACKUP_DIR" ]; then
+                echo -e "\n${YELLOW}Restoring from backup...${NC}"
                 restore_from_backup "$BACKUP_DIR"
             else
+                echo -e "\n${YELLOW}No backup found, performing standard rollback...${NC}"
                 rollback
             fi
             ;;
         *)
+            echo -e "\n${YELLOW}Performing standard rollback...${NC}"
             rollback
             ;;
     esac
     
     cleanup
-    echo -e "${RED}Rollback complete. Please check your system.${NC}"
+    echo -e "${RED}Rollback complete. Installation failed.${NC}"
     exit 1
 }
 
 # Main installation process
 main() {
-    # Set up error handling
-    trap enhanced_rollback ERR
-    trap cleanup EXIT
+    # Set up error handling with line numbers
+    set -E
+    trap 'enhanced_rollback ${LINENO}' ERR
     
     # Create temporary directory
     setup_temp_dir
