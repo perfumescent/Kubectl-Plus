@@ -3,6 +3,7 @@
 # Project information
 PROJECT_NAME="Kubectl-Plus"
 PROJECT_URL="https://github.com/perfumescent/Kubectl-Plus"
+BRANCH="v0.2"
 AUTHOR="perfumescent"
 VERSION="1.0.0"
 
@@ -99,8 +100,8 @@ print_logo() {
 download_commands() {
     echo -e "${BLUE}Downloading kubectl-plus commands...${NC}"
     
-    local base_url="$PROJECT_URL/raw/main"
-    local commands=("l" "f" "i" "p" "autocomplete")
+    local base_url="$PROJECT_URL/raw/$BRANCH"
+    local commands=("l" "f" "i" "p" "kp" "autocomplete")
     
     for cmd in "${commands[@]}"; do
         if ! curl -fsSL "$base_url/cmd/$cmd" -o "$TEMP_DIR/$cmd"; then
