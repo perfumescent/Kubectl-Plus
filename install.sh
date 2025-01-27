@@ -310,24 +310,43 @@ check_local_files() {
 determine_install_mode() {
     if check_local_files; then
         echo -e "\nLocal installation files detected."
-        read -p "Do you want to proceed with local installation? [Y/n] " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            INSTALL_MODE="local"
-            return 0
-        fi
+        while true; do
+            read -p "Do you want to proceed with local installation? [Y/n] " REPLY || true
+            REPLY=${REPLY:-Y}  # 默认值为 Y
+            
+            case $REPLY in
+                [Yy]*)
+                    INSTALL_MODE="local"
+                    return 0
+                    ;;
+                [Nn]*)
+                    break
+                    ;;
+                *)
+                    echo "Please answer Y or N"
+                    ;;
+            esac
+        done
     fi
     
-    echo -e "\nWould you like to download files from the internet? [Y/n] " 
-    read -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        INSTALL_MODE="online"
-        return 0
-    fi
-    
-    echo -e "${RED}No installation mode selected. Exiting...${NC}"
-    exit 1
+    while true; do
+        read -p "Would you like to download files from the internet? [Y/n] " REPLY || true
+        REPLY=${REPLY:-Y}  # 默认值为 Y
+        
+        case $REPLY in
+            [Yy]*)
+                INSTALL_MODE="online"
+                return 0
+                ;;
+            [Nn]*)
+                echo -e "${RED}Installation cancelled by user${NC}"
+                exit 0
+                ;;
+            *)
+                echo "Please answer Y or N"
+                ;;
+        esac
+    done
 }
 
 # Copy local files to temp directory
@@ -517,20 +536,45 @@ enhanced_rollback() {
     local err_line=$1
     local err_cmd="${BASH_COMMAND}"
     
-    echo -e "\n${RED}Installation failed during ${INSTALL_MODE}!${NC}"
+    echo -e "\n${RED}Installation failed during ${INSTALL_MODE:-"setup"}!${NC}"
     echo -e "${RED}Error occurred in line ${err_line}${NC}"
     echo -e "${RED}Command: ${err_cmd}${NC}"
     echo -e "${RED}Exit code: ${err_code}${NC}"
     
-    # 如果是下载失败，显示具体的URL
-    if [[ "$err_cmd" == *"curl"* ]]; then
-        local url=$(echo "$err_cmd" | grep -o 'http[s]*://[^ ]*')
-        echo -e "${RED}Failed to download from: ${url}${NC}"
-        echo -e "${YELLOW}Please check:${NC}"
-        echo -e "1. Your internet connection"
-        echo -e "2. The repository URL: ${PROJECT_URL}"
-        echo -e "3. The branch name: ${BRANCH}"
-    fi
+    # 分析常见错误
+    case $err_cmd in
+        *"read"*)
+            echo -e "${YELLOW}Error in user input handling:${NC}"
+            echo -e "1. If you're running in non-interactive mode, use: ./install.sh -y"
+            echo -e "2. If you're using a script, consider setting INSTALL_MODE directly"
+            ;;
+        *"curl"*)
+            local url=$(echo "$err_cmd" | grep -o 'http[s]*://[^ ]*')
+            echo -e "${RED}Failed to download from: ${url}${NC}"
+            echo -e "${YELLOW}Please check:${NC}"
+            echo -e "1. Your internet connection"
+            echo -e "2. The repository URL: ${PROJECT_URL}"
+            echo -e "3. The branch name: ${BRANCH}"
+            echo -e "4. Try accessing the URL in your browser: ${url}"
+            ;;
+        *"mkdir"*)
+            echo -e "${YELLOW}Directory operation failed:${NC}"
+            echo -e "1. Check if you have write permissions"
+            echo -e "2. Check if the parent directory exists"
+            echo -e "3. Check available disk space"
+            ;;
+        *"cp"*|*"mv"*)
+            echo -e "${YELLOW}File operation failed:${NC}"
+            echo -e "1. Check if you have the required permissions"
+            echo -e "2. Check if the source file exists"
+            echo -e "3. Check if the destination is writable"
+            ;;
+        *)
+            echo -e "${YELLOW}General error occurred:${NC}"
+            echo -e "1. Check the command output above for more details"
+            echo -e "2. Try running with --debug flag for more information"
+            ;;
+    esac
     
     case $INSTALL_MODE in
         "upgrade"|"downgrade"|"reinstall")
@@ -549,7 +593,7 @@ enhanced_rollback() {
     esac
     
     cleanup
-    echo -e "${RED}Rollback complete. Installation failed.${NC}"
+    echo -e "${RED}Installation failed. See error details above.${NC}"
     exit 1
 }
 
