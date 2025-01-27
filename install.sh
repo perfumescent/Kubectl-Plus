@@ -28,6 +28,16 @@ INSTALLED_FILES=()
 # Installation mode
 INSTALL_MODE=""
 
+# Installation options
+INTERACTIVE=true
+AUTO_APPROVE=false
+DEFAULT_NAMESPACE=""
+
+# Check if running in non-interactive mode
+if [ ! -t 0 ]; then
+    INTERACTIVE=false
+fi
+
 # Version file location
 VERSION_FILE="$HOME/.kubectl-plus/version"
 
@@ -248,17 +258,30 @@ install_binaries() {
 # Configure namespace
 configure_namespace() {
     local default_ns=$(get_default_namespace)
-    local namespace=${1:-$default_ns}
+    
+    # 如果命令行指定了命名空间，使用指定的
+    if [ -n "$DEFAULT_NAMESPACE" ]; then
+        namespace="$DEFAULT_NAMESPACE"
+    elif [ "$INTERACTIVE" = true ]; then
+        # 交互式模式下询问用户
+        echo
+        echo -e "Please enter your default namespace [${YELLOW}${default_ns}${NC}]:"
+        read NAMESPACE || true
+        namespace=${NAMESPACE:-$default_ns}
+    else
+        # 非交互式模式使用默认值
+        namespace=$default_ns
+    fi
     
     echo -e "${BLUE}Configuring namespace...${NC}"
     echo -e "Using namespace: ${YELLOW}${namespace}${NC}"
     
     # Update namespace in command files
     for cmd in l f i p; do
-        if [ -f "$BIN_DIR/$cmd" ]; then
-            sed -i "s/dev/${namespace}/g" "$BIN_DIR/$cmd"
+        if [ -f "$BIN_DIR/kp-$cmd" ]; then
+            sed -i "s/dev/${namespace}/g" "$BIN_DIR/kp-$cmd"
         else
-            echo -e "${RED}Warning: Command file $cmd not found in $BIN_DIR${NC}"
+            echo -e "${RED}Warning: Command file kp-$cmd not found in $BIN_DIR${NC}"
         fi
     done
     
@@ -275,6 +298,7 @@ print_help() {
     echo "Options:"
     echo "  -h, --help     Show this help message"
     echo "  -n NAMESPACE   Set default namespace"
+    echo "  -y, --yes      Auto approve installation"
     echo "  --no-color     Disable color output"
     echo
     echo "For more information, visit: $PROJECT_URL"
@@ -308,11 +332,22 @@ check_local_files() {
 
 # Determine installation mode
 determine_install_mode() {
+    # 如果指定了自动模式，直接使用在线安装
+    if [ "$AUTO_APPROVE" = true ]; then
+        INSTALL_MODE="online"
+        return 0
+    fi
+    
+    if [ "$INTERACTIVE" = false ]; then
+        INSTALL_MODE="online"
+        return 0
+    fi
+    
     if check_local_files; then
         echo -e "\nLocal installation files detected."
         while true; do
             read -p "Do you want to proceed with local installation? [Y/n] " REPLY || true
-            REPLY=${REPLY:-Y}  # 默认值为 Y
+            REPLY=${REPLY:-Y}
             
             case $REPLY in
                 [Yy]*)
@@ -331,7 +366,7 @@ determine_install_mode() {
     
     while true; do
         read -p "Would you like to download files from the internet? [Y/n] " REPLY || true
-        REPLY=${REPLY:-Y}  # 默认值为 Y
+        REPLY=${REPLY:-Y}
         
         case $REPLY in
             [Yy]*)
@@ -597,27 +632,20 @@ enhanced_rollback() {
     exit 1
 }
 
-# Main installation process
-main() {
-    # Set up error handling with line numbers
-    set -E
-    trap 'enhanced_rollback ${LINENO}' ERR
-    
-    # Create temporary directory
-    setup_temp_dir
-    
-    print_logo
-    
-    # Parse command line arguments
+# Parse command line arguments
+parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             -h|--help)
                 print_help
                 exit 0
                 ;;
-            -n)
-                NAMESPACE="$2"
-                shift 2
+            -y|--yes)
+                AUTO_APPROVE=true
+                ;;
+            -n|--namespace)
+                DEFAULT_NAMESPACE="$2"
+                shift
                 ;;
             --no-color)
                 RED=''
@@ -625,7 +653,6 @@ main() {
                 YELLOW=''
                 BLUE=''
                 NC=''
-                shift
                 ;;
             *)
                 echo -e "${RED}Unknown option: $1${NC}"
@@ -633,19 +660,34 @@ main() {
                 exit 1
                 ;;
         esac
+        shift
     done
+}
+
+# Main installation process
+main() {
+    # Set up error handling with line numbers
+    set -E
+    trap 'enhanced_rollback ${LINENO}' ERR
     
-    # Welcome message
-    echo -e "${BLUE}Welcome to kubectl-plus installer!${NC}"
-    echo -e "This will install kubectl-plus commands and shell completion."
-    echo
+    # Parse command line arguments
+    parse_args "$@"
+    
+    # Create temporary directory
+    setup_temp_dir
+    
+    print_logo
     
     # Check requirements first
     check_requirements
     
     # Check for existing installation and handle upgrade
     if [ -f "$VERSION_FILE" ] || [ -f "$BIN_DIR/l" ]; then
-        check_upgrade
+        if [ "$AUTO_APPROVE" = true ]; then
+            INSTALL_MODE="upgrade"
+        else
+            check_upgrade
+        fi
         backup_existing_installation
     fi
     
@@ -678,12 +720,7 @@ main() {
     install_completion
     
     # Configure namespace
-    if [ -z "$NAMESPACE" ]; then
-        echo
-        echo -e "Please enter your default namespace [${YELLOW}$(get_default_namespace)${NC}]:"
-        read NAMESPACE
-    fi
-    configure_namespace "${NAMESPACE}"
+    configure_namespace
     
     # Save version information
     save_version_info
