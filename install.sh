@@ -190,18 +190,33 @@ install_completion() {
 install_binaries() {
     echo -e "${BLUE}Installing kubectl-plus commands...${NC}"
     
-    # Install each command
+    # Install main command
+    if [ -f "$BIN_DIR/kp" ]; then
+        cp "$BIN_DIR/kp" "$BACKUP_DIR/"
+        echo -e "${BLUE}Backing up existing command: kp${NC}"
+    fi
+    cp "$TEMP_DIR/kp" "$BIN_DIR/"
+    chmod 755 "$BIN_DIR/kp"
+    INSTALLED_FILES+=("$BIN_DIR/kp")
+    
+    # Install subcommands
     local commands=("l" "f" "i" "p")
     for cmd in "${commands[@]}"; do
-        if [ -f "$BIN_DIR/$cmd" ]; then
-            cp "$BIN_DIR/$cmd" "$BACKUP_DIR/"
-            echo -e "${BLUE}Backing up existing command: ${cmd}${NC}"
+        if [ -f "$BIN_DIR/kp-$cmd" ]; then
+            cp "$BIN_DIR/kp-$cmd" "$BACKUP_DIR/"
+            echo -e "${BLUE}Backing up existing command: kp-${cmd}${NC}"
         fi
         
         # Install new command
-        cp "$TEMP_DIR/$cmd" "$BIN_DIR/"
-        chmod 755 "$BIN_DIR/$cmd"
-        INSTALLED_FILES+=("$BIN_DIR/$cmd")
+        cp "$TEMP_DIR/$cmd" "$BIN_DIR/kp-$cmd"
+        chmod 755 "$BIN_DIR/kp-$cmd"
+        INSTALLED_FILES+=("$BIN_DIR/kp-$cmd")
+        
+        # Create legacy symlinks if they don't exist
+        if [ ! -f "$BIN_DIR/$cmd" ]; then
+            ln -s "$BIN_DIR/kp-$cmd" "$BIN_DIR/$cmd"
+            echo -e "${BLUE}Created legacy symlink: ${cmd}${NC}"
+        fi
     done
     
     # Add bin directory to PATH if needed

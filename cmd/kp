@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+set -e
+
+VERSION="1.0.0"
+COMMANDS=("p" "f" "l" "i")
+
+# 显示帮助信息
+show_help() {
+    echo "Kubectl Plus (kp) - Kubernetes 运维增强工具集"
+    echo
+    echo "用法:"
+    echo "  kp <command> [options]"
+    echo
+    echo "可用命令:"
+    echo "  p         资源查看与管理"
+    echo "  f         跨 Pod 日志搜索"
+    echo "  l         指定 Pod 日志查看"
+    echo "  i         交互式 Pod 访问"
+    echo
+    echo "全局选项:"
+    echo "  -h, --help     显示帮助信息"
+    echo "  -v, --version  显示版本信息"
+    echo
+    echo "使用 'kp <command> --help' 查看具体命令的帮助信息"
+}
+
+# 显示版本信息
+show_version() {
+    echo "kp version ${VERSION}"
+}
+
+# 主函数
+main() {
+    # 处理全局选项
+    case "$1" in
+        "" | "-h" | "--help")
+            show_help
+            exit 0
+            ;;
+        "-v" | "--version")
+            show_version
+            exit 0
+            ;;
+    esac
+
+    # 获取子命令
+    local subcmd="$1"
+    shift
+
+    # 验证子命令是否有效
+    if [[ ! " ${COMMANDS[@]} " =~ " ${subcmd} " ]]; then
+        echo "Error: Unknown subcommand '${subcmd}'" >&2
+        echo "Available subcommands: ${COMMANDS[*]}" >&2
+        exit 1
+    fi
+
+    # 执行子命令
+    local cmd_path
+    cmd_path="$(dirname "$0")/kp-${subcmd}"
+    
+    if [[ ! -x "${cmd_path}" ]]; then
+        echo "Error: Command '${subcmd}' not properly installed" >&2
+        exit 1
+    fi
+
+    exec "${cmd_path}" "$@"
+}
+
+main "$@" 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Get namespaces for completion
 function _get_namespaces() {
@@ -63,126 +63,158 @@ function _handle_namespace_completion() {
     return 1
 }
 
-# Main completion function for l and i commands
-function _kp_completion() {
-    COMPREPLY=()
-    local cur="${COMP_WORDS[COMP_CWORD]}"
-    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+# kp 命令补全函数
+_kp_completion() {
+    local cur prev words cword
+    _get_comp_words_by_ref -n : cur prev words cword
 
-    # First priority: Handle namespace parameter completion
-    if _handle_namespace_completion "$cur" "$prev"; then
+    # 子命令列表
+    local commands="p f l i"
+    
+    # 全局选项
+    local global_opts="-h --help -v --version"
+    
+    # 如果是第一个参数，补全子命令和全局选项
+    if [ $cword -eq 1 ]; then
+        COMPREPLY=( $(compgen -W "$commands $global_opts" -- "$cur") )
         return 0
     fi
 
-    # Second priority: Handle other parameters
-    if [[ "$cur" == -* ]]; then
-        COMPREPLY=($(compgen -W "-n --namespace -c --container -s --shell -f --follow -t --tail" -- "$cur"))
-        return 0
-    fi
-
-    # Get current namespace for pod/container completion
-    local namespace="dev"  # Default namespace
-    for ((i=1; i<${#COMP_WORDS[@]}-1; i++)); do
-        if [[ "${COMP_WORDS[i]}" == "-n" || "${COMP_WORDS[i]}" == "--namespace" ]]; then
-            namespace="${COMP_WORDS[i+1]}"
-            break
-        fi
-    done
-
-    # Third priority: Handle first argument (pod name)
-    if [[ ${#COMP_WORDS[@]} -eq 2 ]]; then
-        local pods=$(_get_pods "$namespace")
-        if [ -n "$pods" ]; then
-            COMPREPLY=($(compgen -W "$pods" -- "$cur"))
-        fi
-        return 0
-    fi
-
-    # Fourth priority: Handle container completion
-    if [[ "$prev" == "-c" || "$prev" == "--container" ]]; then
-        if [ -n "${COMP_WORDS[1]}" ]; then
-            local containers=$(kubectl -n "$namespace" get pod "${COMP_WORDS[1]}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
-            COMPREPLY=($(compgen -W "$containers" -- "$cur"))
-        fi
-        return 0
-    fi
+    # 获取子命令
+    local subcmd="${words[1]}"
+    
+    # 根据子命令调用对应的补全函数
+    case "$subcmd" in
+        p)
+            _kp_p_completion
+            ;;
+        f)
+            _kp_f_completion
+            ;;
+        l)
+            _kp_l_completion
+            ;;
+        i)
+            _kp_i_completion
+            ;;
+    esac
 }
 
-# Completion function for f command
-function _kp_completion_f() {
-    COMPREPLY=()
-    local cur="${COMP_WORDS[COMP_CWORD]}"
-    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+# p 命令补全
+_kp_p_completion() {
+    local cur prev words cword
+    _get_comp_words_by_ref -n : cur prev words cword
 
-    # First priority: Handle namespace parameter completion
-    if _handle_namespace_completion "$cur" "$prev"; then
-        return 0
-    fi
-
-    # Second priority: Handle other parameters
-    if [[ "$cur" == -* ]]; then
-        COMPREPLY=($(compgen -W "-n --namespace -c --container -p --path" -- "$cur"))
-        return 0
-    fi
-
-    # Get current namespace for service completion
-    local namespace="dev"  # Default namespace
-    for ((i=1; i<${#COMP_WORDS[@]}-1; i++)); do
-        if [[ "${COMP_WORDS[i]}" == "-n" || "${COMP_WORDS[i]}" == "--namespace" ]]; then
-            namespace="${COMP_WORDS[i+1]}"
-            break
-        fi
-    done
-
-    # Third priority: Handle first argument (service name)
-    if [[ ${#COMP_WORDS[@]} -eq 2 ]]; then
-        local services=$(_get_services "$namespace")
-        if [ -n "$services" ]; then
-            COMPREPLY=($(compgen -W "$services" -- "$cur"))
-        fi
-        return 0
-    fi
-}
-
-# Completion function for p command
-function _kp_completion_p() {
-    COMPREPLY=()
-    local cur="${COMP_WORDS[COMP_CWORD]}"
-    local prev="${COMP_WORDS[COMP_CWORD-1]}"
-
-    # First priority: Handle namespace parameter completion
-    if _handle_namespace_completion "$cur" "$prev"; then
-        return 0
-    fi
-
-    # Second priority: Handle resource type completion
-    if [[ ${#COMP_WORDS[@]} -eq 2 ]]; then
-        COMPREPLY=($(compgen -W "$(_get_resources)" -- "$cur"))
-        return 0
-    fi
-
-    # Third priority: Handle other parameters
+    # 资源类型
+    local resources="pod svc deploy rs sts"
+    # 选项
+    local opts="-n --namespace -o --output -l --selector -A --all-namespaces -S --sort"
+    
     case "$prev" in
+        -n|--namespace)
+            COMPREPLY=( $(compgen -W "$(kubectl get ns -o name | cut -d/ -f2)" -- "$cur") )
+            return 0
+            ;;
         -o|--output)
-            COMPREPLY=($(compgen -W "json yaml wide custom" -- "$cur"))
+            COMPREPLY=( $(compgen -W "json yaml wide custom" -- "$cur") )
             return 0
             ;;
         -S|--sort)
-            COMPREPLY=($(compgen -W "name status age" -- "$cur"))
+            COMPREPLY=( $(compgen -W "name status age" -- "$cur") )
             return 0
             ;;
         *)
-            if [[ "$cur" == -* ]]; then
-                COMPREPLY=($(compgen -W "-n --namespace -w --wide -l --selector -o --output -A --all-namespaces -S --sort" -- "$cur"))
-                return 0
-            fi
+            COMPREPLY=( $(compgen -W "$resources $opts" -- "$cur") )
+            return 0
+            ;;
+    esac
+}
+
+# f 命令补全
+_kp_f_completion() {
+    local cur prev words cword
+    _get_comp_words_by_ref -n : cur prev words cword
+
+    local opts="-n --namespace -c --container -p --path -C --context -t --tail"
+    
+    case "$prev" in
+        -n|--namespace)
+            COMPREPLY=( $(compgen -W "$(kubectl get ns -o name | cut -d/ -f2)" -- "$cur") )
+            return 0
+            ;;
+        -c|--container)
+            local ns pod
+            ns=$(echo "${words[@]}" | grep -o '\(-n\|--namespace\) [^ ]*' | cut -d' ' -f2)
+            [ -z "$ns" ] && ns="default"
+            pod="${words[2]}"
+            COMPREPLY=( $(compgen -W "$(kubectl get pod $pod -n $ns -o jsonpath='{.spec.containers[*].name}')" -- "$cur") )
+            return 0
+            ;;
+        *)
+            COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+            return 0
+            ;;
+    esac
+}
+
+# l 命令补全
+_kp_l_completion() {
+    local cur prev words cword
+    _get_comp_words_by_ref -n : cur prev words cword
+
+    local opts="-n --namespace -c --container -p --path -s --since -t --tail -f --follow"
+    
+    case "$prev" in
+        -n|--namespace)
+            COMPREPLY=( $(compgen -W "$(kubectl get ns -o name | cut -d/ -f2)" -- "$cur") )
+            return 0
+            ;;
+        -c|--container)
+            local ns pod
+            ns=$(echo "${words[@]}" | grep -o '\(-n\|--namespace\) [^ ]*' | cut -d' ' -f2)
+            [ -z "$ns" ] && ns="default"
+            pod="${words[2]}"
+            COMPREPLY=( $(compgen -W "$(kubectl get pod $pod -n $ns -o jsonpath='{.spec.containers[*].name}')" -- "$cur") )
+            return 0
+            ;;
+        *)
+            COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+            return 0
+            ;;
+    esac
+}
+
+# i 命令补全
+_kp_i_completion() {
+    local cur prev words cword
+    _get_comp_words_by_ref -n : cur prev words cword
+
+    local opts="-n --namespace -c --container -s --shell -u --user"
+    
+    case "$prev" in
+        -n|--namespace)
+            COMPREPLY=( $(compgen -W "$(kubectl get ns -o name | cut -d/ -f2)" -- "$cur") )
+            return 0
+            ;;
+        -c|--container)
+            local ns pod
+            ns=$(echo "${words[@]}" | grep -o '\(-n\|--namespace\) [^ ]*' | cut -d' ' -f2)
+            [ -z "$ns" ] && ns="default"
+            pod="${words[2]}"
+            COMPREPLY=( $(compgen -W "$(kubectl get pod $pod -n $ns -o jsonpath='{.spec.containers[*].name}')" -- "$cur") )
+            return 0
+            ;;
+        -s|--shell)
+            COMPREPLY=( $(compgen -W "sh bash zsh" -- "$cur") )
+            return 0
+            ;;
+        *)
+            COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
+            return 0
             ;;
     esac
 }
 
 # Register completions
-complete -F _kp_completion l
-complete -F _kp_completion i
-complete -F _kp_completion_f f
-complete -F _kp_completion_p p
+complete -F _kp_completion kp
 
