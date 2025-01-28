@@ -195,12 +195,16 @@ install_completion() {
     case "$shell_type" in
         "bash")
             cp "$TEMP_DIR/autocomplete" ~/.kubectl-plus-completion
-            echo "source ~/.kubectl-plus-completion" >> ~/.bashrc
+            if ! grep -q "source.*kubectl-plus-completion" ~/.bashrc; then
+                echo "source ~/.kubectl-plus-completion" >> ~/.bashrc
+            fi
             source ~/.bashrc
             ;;
         "zsh")
             cp "$TEMP_DIR/autocomplete" ~/.kubectl-plus-completion
-            echo "source ~/.kubectl-plus-completion" >> ~/.zshrc
+            if ! grep -q "source.*kubectl-plus-completion" ~/.zshrc; then
+                echo "source ~/.kubectl-plus-completion" >> ~/.zshrc
+            fi
             source ~/.zshrc
             ;;
         *)
@@ -211,6 +215,7 @@ install_completion() {
     
     INSTALLED_FILES+=("$HOME/.kubectl-plus-completion")
     echo -e "${GREEN}✓ Completion installed${NC}"
+    echo -e "${YELLOW}Note: You may need to restart your shell or run: source ~/.${shell_type}rc${NC}"
 }
 
 # Install binaries
