@@ -669,6 +669,17 @@ parse_args() {
     done
 }
 
+# Install test dependencies
+install_test_deps() {
+    echo -e "${BLUE}安装测试依赖...${NC}"
+    if ! command -v bats &> /dev/null; then
+        sudo apt-get install -y bats
+    fi
+    git clone https://github.com/bats-core/bats-assert.git test/helpers/bats-assert
+    git clone https://github.com/bats-core/bats-support.git test/helpers/bats-support
+    echo -e "${GREEN}✓ 测试依赖安装完成${NC}"
+}
+
 # Main installation process
 main() {
     # Set up error handling with line numbers
@@ -729,6 +740,9 @@ main() {
     
     # Save version information
     save_version_info
+    
+    # Install test dependencies
+    install_test_deps
     
     # Final message with version information
     echo

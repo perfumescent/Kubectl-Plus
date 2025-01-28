@@ -1,0 +1,20 @@
+name: CLI Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Install bats
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bats
+        git clone https://github.com/bats-core/bats-assert.git test/helpers/bats-assert
+        git clone https://github.com/bats-core/bats-support.git test/helpers/bats-support
+        
+    - name: Run tests
+      run: |
+        bats -r test/ 
